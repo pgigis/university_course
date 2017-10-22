@@ -1,7 +1,6 @@
 package exercise1;
 
 import java.io.InputStream;
-
 import java.io.OutputStream;
 import java.util.Set;
 import java.io.IOException;
@@ -23,6 +22,8 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.log4j.Logger;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -36,12 +37,19 @@ public class Exercise1 extends Configured implements Tool {
 	@Override
 	public int run(String[] args) throws Exception {
 		// TODO Auto-generated method stub
+		long startTime = System.nanoTime();
+		
 		Job job_1 = new Job(getConf(), "Exercise1");
 		job_1.setJarByClass(Exercise1.class);
 		job_1.setOutputKeyClass(Text.class);
 		job_1.setOutputValueClass(IntWritable.class);
 	
 		job_1.setMapperClass(Map_stage_1.class);
+		
+		job_1.setCombinerClass(Reduce_stage_1.class);
+		//job_1.setNumReduceTasks(50);
+
+		//enableMapOutputCompress(job_1);
 		
 	    job_1.setReducerClass(Reduce_stage_1.class);
 	
@@ -62,9 +70,12 @@ public class Exercise1 extends Configured implements Tool {
 		job_2.setNumReduceTasks(1);
 		job_2.setSortComparatorClass(DescendingComparator.class);
 		
+		//enableMapOutputCompress(job_2);
+		
 		job_2.setMapOutputValueClass(Text.class);
 		job_2.setMapOutputKeyClass(IntWritable.class);
-		
+		job_2.setCombinerClass(Reduce_stage_2.class);
+
 	    job_2.setReducerClass(Reduce_stage_2.class);
 	
 	    job_2.setInputFormatClass(TextInputFormat.class);
@@ -74,8 +85,9 @@ public class Exercise1 extends Configured implements Tool {
 	    FileOutputFormat.setOutputPath(job_2, new Path(args[1]));
 	
 	    job_2.waitForCompletion(true);
-	  
-	  
+	    long stopTime = System.nanoTime();
+	    double seconds = (double) (stopTime-startTime)/1000000000.0;
+	    System.out.println(seconds);
 	  return 0;
 
 	}
@@ -97,7 +109,7 @@ public class Exercise1 extends Configured implements Tool {
       public void map(LongWritable key, Text value, Context context)
               throws IOException, InterruptedException {
          for (String token: value.toString().split("\\s+")) {
-   		  	token = token.replaceAll("[-+.^:,]", "");
+   		  //token = token.replaceAll("[-+.^:,]", ""); Case remove illegal characters
 
             if((token.matches("[a-zA-Z0-9]+")) && !token.isEmpty()){ 
             	word.set(token.toLowerCase());
@@ -109,13 +121,7 @@ public class Exercise1 extends Configured implements Tool {
    
    // Map <KEYIN, VALUEIN, KEYOUT, VALUEOUT>
    public static class Reduce_stage_1 extends Reducer<Text, IntWritable, Text, IntWritable> {
-     private int k = 10;
-	  	protected void setup(Reducer.Context context)
-		      throws IOException,
-		        InterruptedException {
-		      Configuration config = context.getConfiguration();
-		      this.k = config.getInt("exercise1.case.k", 10);
-	   	}
+    
       @Override
       public void reduce(Text key, Iterable<IntWritable> values, Context context)
               throws IOException, InterruptedException {
@@ -181,6 +187,11 @@ public class Exercise1 extends Configured implements Tool {
 	        IntWritable key2 = (IntWritable) w2;          
 	        return -1 * key1.compareTo(key2);
 	    }
+   }
+   
+   public static void enableMapOutputCompress(Job job){
+	   job.getConfiguration().setBoolean("mapred.compress.map.output",true);
+	   job.getConfiguration().setClass("mapred.map.output.compression.codec", SnappyCodec.class, CompressionCodec.class);
    }
 
 }

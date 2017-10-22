@@ -59,9 +59,9 @@ public class Exercise3 extends Configured implements Tool {
 		job_1.setOutputValueClass(CustomKeyValue_.class);
 	
 		job_1.setMapperClass(Map.class);
-		
 	    job_1.setReducerClass(Reduce.class);
-	
+	    job_1.setCombinerClass(Combine.class);
+	    
 	    job_1.setInputFormatClass(TextInputFormat.class);
 	    job_1.setOutputFormatClass(TextOutputFormat.class);
 	
@@ -190,6 +190,25 @@ public class Exercise3 extends Configured implements Tool {
     	  }
       }
 
+   }
+   
+   public static class Combine extends Reducer <Text, CustomKeyValue_, Text, CustomKeyValue_>{
+	   
+	   @Override
+	   public void reduce(Text key, Iterable<CustomKeyValue_> values, Context context)
+	              throws IOException, InterruptedException {
+		   
+		   int occurrences = 0;
+		   String document = null;
+		   for (CustomKeyValue_ val : values) {
+			   occurrences += val.getOccurrence().get();
+			   document = val.getDocument().toString();
+		   }
+		   
+		   context.write(key, new CustomKeyValue_(new Text(document), new IntWritable(occurrences)));
+		   
+	   }
+	   
    }
    
    // Map <KEYIN, VALUEIN, KEYOUT, VALUEOUT>

@@ -42,10 +42,19 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.omg.CORBA.portable.InputStream;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.CounterGroup;
+import org.apache.hadoop.mapreduce.Counters;
+
 
 public class Exercise2 extends Configured implements Tool {
 
 	private static final Charset UTF8 = null;
+	
+	public static enum CustomCounters {
+		UniqFileOccurs,
+		UniqWordOccurs
+	}
 
 	@Override
 	public int run(String[] args) throws Exception {
@@ -68,6 +77,7 @@ public class Exercise2 extends Configured implements Tool {
 		MultipleOutputs.addNamedOutput(job_1, "count", TextOutputFormat.class, Text.class, Text.class);
 		MultipleOutputs.addNamedOutput(job_1, "uniqfiles", TextOutputFormat.class, Text.class, Text.class);
 
+		
 	    job_1.waitForCompletion(true);
 	    
 	    
@@ -137,6 +147,13 @@ public class Exercise2 extends Configured implements Tool {
 	    
 	    job_2.waitForCompletion(true);
 	    
+	    Counter UniqWordOccurs_ = job_1.getCounters().findCounter(CustomCounters.UniqWordOccurs);
+		
+	    System.out.println("Words only seen only one time: " + UniqWordOccurs_.getValue());
+		
+	    Counter UniqFileOccurs_ = job_1.getCounters().findCounter(CustomCounters.UniqFileOccurs);
+		
+	    System.out.println("Words seen in one file only : " + UniqFileOccurs_.getValue());
 	  
 	  return 0;
 
@@ -176,7 +193,7 @@ public class Exercise2 extends Configured implements Tool {
     	  String filename = ((FileSplit) context.getInputSplit()).getPath().getName();
     	  
     	  for (String token: value.toString().split("\\s+")) {
-    		  token = token.replaceAll("[-+.^:,_]", "");
+    		  //token = token.replaceAll("[-+.^:,_]", "");
     		  word.set(token.toLowerCase());
 
     		  if(stopwords.get(token.toLowerCase()) == null && token.matches("[a-zA-Z0-9]+") && !token.isEmpty()){
@@ -195,6 +212,7 @@ public class Exercise2 extends Configured implements Tool {
 	   private MultipleOutputs<Text,Text> multiple_output;
 	   private int counter;
 	   private int uniq_files_occurencies;
+	   private int uniq_words;
 	   
 	   @Override
 	   public void setup(Context context) throws IOException, InterruptedException{
@@ -209,8 +227,13 @@ public class Exercise2 extends Configured implements Tool {
 		 int count_files_seen = 0;
          StringBuffer list_str = new StringBuffer();
          Set<String> tmp_str = new TreeSet<String>();
+         int occurrences = 0;
          for (Text val : values) {
-            tmp_str.add(val.toString());   
+            tmp_str.add(val.toString());
+            occurrences++;
+         }
+         if(occurrences == 1){
+        	 context.getCounter(CustomCounters.UniqWordOccurs).increment(1);
          }
          
          for (String v: tmp_str){
@@ -222,6 +245,7 @@ public class Exercise2 extends Configured implements Tool {
          
          if(count_files_seen == 1){
         	 uniq_files_occurencies++;
+        	 context.getCounter(CustomCounters.UniqFileOccurs).increment(1);
          }
          count_files_seen = 0; //just in case
          
@@ -235,7 +259,6 @@ public class Exercise2 extends Configured implements Tool {
 	  public void cleanup(Context context) throws IOException, InterruptedException{
 		  multiple_output.write("count", new Text("Total"), new Text(Integer.toString(counter)));
 		  multiple_output.write("uniqfiles", new Text("Total"), new Text(Integer.toString(uniq_files_occurencies)));
-
 		  multiple_output.close();
 	  }
    }
