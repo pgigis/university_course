@@ -1,0 +1,1 @@
+Its result is an inverted index.
